@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-BB-vs-BB 夜战炮击命中率 · 有限元（蒙特卡洛）推算
+BB-vs-BB Night Gunnery Hit-Rate · Finite-Element (Monte Carlo) Estimate
+战列舰夜战炮击命中率 · 有限元（蒙特卡洛）推算
 ====================================================
 
 方法论（用户 2026-09-24 指令）：
