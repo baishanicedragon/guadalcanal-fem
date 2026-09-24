@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-aircraft_dogfight_fem.py
+aircraft_dogfight_fem.py — WWII Carrier Fighter Dogfight (Energy-Maneuverability + Turn) FEM
 =====================================================================
 二战舰载战斗机近距空战（dogfight）有限元推演模组
 ---------------------------------------------------------------------
