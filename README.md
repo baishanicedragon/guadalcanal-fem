@@ -39,6 +39,7 @@ guadalcanal_fem/
 │   ├── aerial_torpedo_fem.py      # 飞机投雷（九一式/九七舰攻/一式陆攻）命中率 FEM
 │   ├── aircraft_dogfight_fem.py   # 飞机 dogfight：能量机动 + 回转机动 交换比 FEM
 │   ├── joint_tarawa_wargame.py    # 联合推演编排：串联上述 FEM 跑塔拉瓦 1943 末大战
+│   ├── tarawa_timeline.py         # 连续时间线版：从夜战起、每 30 分钟一步的连续推演
 │   └── report_200.py              # 200 次蒙特卡洛 · 双方成败 + 逐舰下场报告
 ├── cases/
 │   ├── battleship_gunnery/        # 【案例】1904-1945 战列舰炮战命中数据集与假说检验
@@ -55,7 +56,8 @@ guadalcanal_fem/
 │       └── run_output.txt         #   aircraft_dogfight_fem.py 原始输出
 │   └── tarawa_joint/               # 【案例】塔拉瓦 1943 末 · 联合推演（P0–P6 全阶段）
 │       ├── README.md              #   战役序列 + 标定锚 + 结果 + 诚实边界
-│       └── run_output.txt         #   joint_tarawa_wargame.py 原始输出
+│       ├── run_output.txt         #   joint_tarawa_wargame.py 原始输出（n=500 均值）
+│       └── timeline_output.txt    #   tarawa_timeline.py 连续时间线（30 分钟一步，seed=42）
 └── results/                       # 预留：用户自行运行产出的聚合结果（默认不提交大文件）
 ```
 
@@ -84,6 +86,9 @@ python aircraft_dogfight_fem.py  # 干净性能底 + 场景1(机体) / 场景2(f
 
 # 3c) 联合推演：塔拉瓦 1943 末（串联上述 FEM 跑 P0–P6 全阶段大战）
 python joint_tarawa_wargame.py 500   # n=500 蒙特卡洛，seed=42，输出夺岛/双方损失/撤运
+
+# 3d) 连续时间线版：从夜战起、每 30 分钟一步的连续推演（单次实现 seed=42）
+python tarawa_timeline.py > ../cases/tarawa_joint/timeline_output.txt
 
 # 4) 双方成败数字 + 逐舰下场报告（200 次，seed=42）
 python report_200.py > ../cases/guadalcanal_night_1942/200MC_report.md
