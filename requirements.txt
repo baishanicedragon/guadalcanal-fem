@@ -1,0 +1,4 @@
+# WW2 Naval Battle Compute
+# No third-party dependencies. Standard library only:
+#   random, math, statistics, argparse, csv, subprocess, os, sys
+# Verified on CPython 3.8+.
