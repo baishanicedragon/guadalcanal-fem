@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Generated / large per-run outputs (not committed)
+**/output/
+*.csv
+runlog*.json
+stats.json
+per_ship*.json
+shots*.csv
+final1000.json
+*_out/
+_legacy/
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Secrets / credentials — NEVER commit
+*.token
+*.pat
+gh_pat.txt
+.env
