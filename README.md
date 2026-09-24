@@ -12,11 +12,12 @@
 
 ## 这个模型回答什么 / 不回答什么
 
-- ✅ 在**给定装备、训练、夜战条件**下，舰炮、水面鱼雷、以及**飞机投雷攻击几何**的**概率分布**，
-  以及双方**战损（沉没 / 重创 / 退出）的分布**。
-- ❌ **不**预测单场确定性结果；航空作战的**闭环飞行员控制**（俯冲轰炸 / 水平轰炸）未建模；
+- ✅ 在**给定装备、训练、夜战条件**下，舰炮、水面鱼雷、飞机投雷攻击几何、以及**飞机近距空战（dogfight）
+  的能量机动 / 回转机动交换比**的**概率分布**，以及双方**战损（沉没 / 重创 / 退出）的分布**。
+- ❌ **不**预测单场确定性结果；航空作战的**闭环飞行员操控手感**（俯冲轰炸 / 水平轰炸）未建模；
   反潜、水雷、两栖、电子战软杀伤；**不**建模剧烈规避机动（蛇形 / 急转）。
-  （飞机投雷以**开环几何＋战斗投弹成功率参数**建模，详见 `src/aerial_torpedo_fem.py`）
+  （飞机投雷以**开环几何＋战斗投弹成功率参数**建模；飞机 dogfight 以**开环 E-M 几何＋飞行员质量因子**建模，
+  详见 `src/aerial_torpedo_fem.py` 与 `src/aircraft_dogfight_fem.py`）
 - 完整边界、假设、数据分级见 **[docs/model_applicability.md](docs/model_applicability.md)**。
 
 ---
@@ -36,6 +37,7 @@ guadalcanal_fem/
 │   ├── gunnery_fem.py             # 战列舰 vs 战列舰 夜战炮击命中率 FEM
 │   ├── torpedo_fem.py             # 驱逐舰直线雷对匀速编队 命中率 FEM
 │   ├── aerial_torpedo_fem.py      # 飞机投雷（九一式/九七舰攻/一式陆攻）命中率 FEM
+│   ├── aircraft_dogfight_fem.py   # 飞机 dogfight：能量机动 + 回转机动 交换比 FEM
 │   └── report_200.py              # 200 次蒙特卡洛 · 双方成败 + 逐舰下场报告
 ├── cases/
 │   ├── battleship_gunnery/        # 【案例】1904-1945 战列舰炮战命中数据集与假说检验
@@ -47,6 +49,9 @@ guadalcanal_fem/
 │   └── aerial_torpedo_raid/       # 【案例】瓜岛 10/25 fork 次日 · 飞机投雷三段链推演
 │       ├── README.md              #   场景 A 拂晓G4M突袭残队 / B 南云Kate反杀企业号
 │       └── run_output.txt         #   aerial_torpedo_fem.py 原始输出
+│   └── aircraft_dogfight/          # 【案例】1943 能量机动+回转机动 dogfight · fork 状态力量对比
+│       ├── README.md              #   场景1 机体对比 / 场景2 中太平洋交战 + fork 订正
+│       └── run_output.txt         #   aircraft_dogfight_fem.py 原始输出
 └── results/                       # 预留：用户自行运行产出的聚合结果（默认不提交大文件）
 ```
 
@@ -69,6 +74,9 @@ python mc_fem.py --n 200 --scenario historical  # 史实瓜岛夜战：比睿/�
 
 # 3) 飞机投雷 FEM（九一式/九七舰攻/一式陆攻 → 10/25 fork 次日三段链）
 python aerial_torpedo_fem.py     # 干净几何底 + 反击战损模型 + 场景 A/B/B' 推演
+
+# 3b) 飞机 dogfight FEM（能量机动 + 回转机动 → 1943 fork 中太平洋力量对比）
+python aircraft_dogfight_fem.py  # 干净性能底 + 场景1(机体) / 场景2(fork交战) / 敏感性
 
 # 4) 双方成败数字 + 逐舰下场报告（200 次，seed=42）
 python report_200.py > ../cases/guadalcanal_night_1942/200MC_report.md
@@ -97,6 +105,11 @@ python analyze.py          # 产出 output/report.html（自包含 SVG 图表 + 
    与可靠性，而非几何。套到 10/25 fork 次日：拂晓 G4M 突袭残队（无弹无 CAP）期望 11.7 雷命中、沉没 99.9%；
    南云 Kate 突击 fork 企业号（CAP 减半）期望 8.0 雷命中、沉没 98.6%——**反杀概率远高于史实**，
    三段链（突袭残队→金凯德追日战列舰→南云反杀）自洽。
+5. **飞机 dogfight（能量机动 + 回转机动）**：在 1942 fork（日本赢瓜岛、获"完整 1943"）背景下，
+   山本用**成熟机体换发（金星零战 = A6M 机体 + 金星62型 1500-1560hp）+ 油旁训练拔升飞行员质量 + 三级体系真训**，
+   把 1943 中太平洋空战从 OTL 的崩溃（交换比 0.40）拉到**局部均势甚至日优（单场 1.10 / 战役 1.78）**；
+   但这是**窗口期红利**——工业/人口/教官池/双刃教条四条铁律未动，1944 仍是美国的年。
+   最敏感的杠杆是**飞行员质量**（金星零战对 F6F，JP PQF 0.50→0.92 对应交换比 0.74→1.28），非机体。
 
 ---
 
