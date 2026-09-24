@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-飞机投雷 · 有限元（蒙特卡洛）推算   (aerial_torpedo_fem)
+Aerial Torpedo Bombing Hit-Rate · Finite-Element (Monte Carlo) Estimate  (aerial_torpedo_fem)
+飞机投雷 · 有限元（蒙特卡洛）推算
 =============================================================
 
 用户 2026-09-24 指令：
