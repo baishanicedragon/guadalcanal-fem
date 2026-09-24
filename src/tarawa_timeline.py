@@ -48,9 +48,9 @@ def spread(n, steps):
         i += 1
     return out
 
-def run_timeline(seed=42):
+def run_timeline(seed=42, doctrine=None):
     rng = random.Random(seed)
-    res = JT.campaign(rng)
+    res = JT.campaign(rng, doctrine)
     log = res["log"]
 
     # ── 起始状态（P0 空袭后，P1 编组后）──
@@ -62,11 +62,14 @@ def run_timeline(seed=42):
         "aircraft": JT.US_FLEET["aircraft"] - log["p0"][0],
     }
     jp = {
-        "CV": JT.JP_FLEET["CV"], "BB_super": JT.JP_FLEET["BB_super"],
+        "CV": JT.JP_FLEET["CV"], "CV_hybrid": JT.JP_FLEET["CV_hybrid"],
+        "BB_super": JT.JP_FLEET["BB_super"],
         "BB": JT.JP_FLEET["BB"], "CA": JT.JP_FLEET["CA"],
         "CL": JT.JP_FLEET["CL"], "DD": JT.JP_FLEET["DD"],
         "SS": JT.JP_FLEET["SS"],
         "carrier_aircraft": JT.JP_FLEET["carrier_aircraft"],
+        "taiho_aircraft": JT.JP_FLEET["taiho_aircraft"],
+        "hybrid_aircraft": JT.JP_FLEET["hybrid_aircraft"],
         "land_bombers": JT.JP_FLEET["land_bombers"] - log["p0"][1],
         "garrison_fighters": JT.JP_FLEET["garrison_fighters"] - log["p0"][2],
     }
@@ -77,7 +80,7 @@ def run_timeline(seed=42):
     # ── 各阶段真实损失（单次实现）──
     bb2, ca2, dd2, jpdd2 = log["p2"]
     bb3, usair3, jpair3 = log["p3"]
-    cv_lost, jp_air_loss, _ = log["p4"]
+    cv4, jpair4, jpcv4, usbb4, usca4, jpdd4 = log["p4"]
     us_ship_lost, jp_ship_lost = log["p5"]
     evac, evac_dd, evac_ss = log["p6"]
 
@@ -106,13 +109,39 @@ def run_timeline(seed=42):
         if n: put(s, jp, "carrier_aircraft", n)
 
     # 跨越轰炸 P4：第一击 step17(D+4 06:30 发射后撤) + 第二击 step63(D+5 05:30 岸基再战)
-    w1 = int(round(jp_air_loss * 0.60))
-    w2 = jp_air_loss - w1
-    if w1: put(17, jp, "carrier_aircraft", w1)
-    if w2: put(63, jp, "carrier_aircraft", w2)
-    # 美航母重创：主要在第一击窗口
-    for s, n in spread(cv_lost, [17, 63]).items():
-        if n: put(s, us, "CV", n)
+    # 日航空损耗按容量比例摊到 航母机/二线机（与 joint _airpool_loss 同式）
+    w1 = int(round(jpair4 * 0.60))
+    w2 = jpair4 - w1
+    cap_c0 = jp["carrier_aircraft"]
+    cap_s0 = jp["taiho_aircraft"] + jp["hybrid_aircraft"]
+    sc = cap_c0 / max(1, cap_c0 + cap_s0)
+    for w, s in ((w1, 17), (w2, 63)):
+        wc = int(round(w * sc))
+        ws = w - wc
+        if wc: put(s, jp, "carrier_aircraft", wc)
+        if ws:
+            ht = int(round(ws * jp["taiho_aircraft"] / max(1, cap_s0)))
+            if ht: put(s, jp, "taiho_aircraft", ht)
+            if ws - ht: put(s, jp, "hybrid_aircraft", ws - ht)
+    # 美舰损失按方针落点：cv_first→CV/CVL(两波)；bb_line→BB线/CA(第一击为主)
+    # cv4 是 CV+CVL 合计数，按剩余量先 CV 后 CVL 拆分落格
+    cv_w1 = int(round(cv4 * 0.60))
+    cv_w2 = cv4 - cv_w1
+    for w, s in ((cv_w1, 17), (cv_w2, 63)):
+        k1 = min(w, us["CV"])
+        if k1: put(s, us, "CV", k1)
+        k2 = min(w - k1, us["CVL"])
+        if k2: put(s, us, "CVL", k2)
+    for s, n in spread(usbb4, [17]).items():
+        if n: put(s, us, "BB_new", n)
+    for s, n in spread(usca4, [17]).items():
+        if n: put(s, us, "CA", n)
+    # 日CV损失：发射点被回溯 → 美反搜索（D+4 午后窗口）
+    for s, n in spread(jpcv4, [33]).items():
+        if n: put(s, jp, "CV", n)
+    # 美航母反击第二舰队（拂晓-上午窗口）
+    for s, n in spread(jpdd4, [17, 33]).items():
+        if n: put(s, jp, "DD", n)
 
     # 潜艇 P5：夜 3(23:30) / 拂晓 15(05:30) / 白昼 33(D+4 15:00) / 次日 63
     for s, n in spread(us_ship_lost, [3, 15, 33, 63]).items():
@@ -143,10 +172,10 @@ def run_timeline(seed=42):
         7: "02:00 第二舰队转向脱离；夜战结束，未歼灭（双方均可撤）。",
         15: "陆攻（G4M+银河/火星发动机）与金星零战自马绍尔/南洋集结地去袭美慢速本队（炮击队）；潜艇互击持续。",
         16: "美航母被迫派 CAP 护本队 → 与金星零战空战（交换比 1.10，日优）。",
-        17: "小泽 6 艘航母机群全出击后立即西撤离开美打击范围；飞行员空袭后退往附近岸上机场加油。",
-        33: "日机在岸基加油再整备；美舰队维持封锁；零星潜艇接触。",
+        17: "小泽打击包（瑞凤36机直卫第二舰队不进包；护航金星零战+天山/彗星级舰攻舰爆）全出击后立即西撤；飞行员退岸加油。",
+        33: "美反击窗口：侦察机回溯发射点（若命中则日航母受损）+ 猎击西撤第二舰队（瑞凤直卫拦截）；日机岸基再整备。",
         48: "丁型(松型)驱逐舰+舰队潜艇驶抵塔拉瓦，撤运残兵；双方潜艇互有损失（反潜）。",
-        63: "D+5 拂晓岸基再整备机群发动第二波跨越轰炸；美航母再遭重创；联合推演收束。",
+        63: "D+5 拂晓岸基再整备机群发动第二波跨越轰炸；联合推演收束。",
     }
     PHASE = {}
     for s in range(0, 8): PHASE[s] = "P2 夜战"
@@ -184,6 +213,8 @@ def main():
     rows, res = run_timeline(42)
     print("=" * 100)
     print("  塔拉瓦 1943 末 · 连续时间线推演（从夜战起，30 分钟一步）  seed=42")
+    print("  方针 = %s（bb_line=打残舰就撤 / cv_first=先打航母放血；方针对比见 joint 输出）"
+          % JT.JP_DOCTRINE)
     print("  （单次实现；均值见 run_output.txt。时钟/接敌时刻为建模假设）")
     print("=" * 100)
     hdr = "%-4s %-12s %-14s %-46s | %s" % ("步", "时钟", "阶段", "事件", "美/日 舰队状态(关键)")
@@ -196,9 +227,13 @@ def main():
         return "CV%d CVL%d BB新%d CA%d CL%d DD%d SS%d 机%d" % (
             d["CV"], d["CVL"], d["BB_new"], d["CA"], d["CL"], d["DD"], d["SS"], d["aircraft"])
     def fJp(d):
-        return "CV%d 大和%d BB%d CA%d CL%d DD%d SS%d 航母机%d 陆攻%d 驻机%d" % (
-            d["CV"], d["BB_super"], d["BB"], d["CA"], d["CL"], d["DD"], d["SS"],
-            d["carrier_aircraft"], d["land_bombers"], d["garrison_fighters"])
+        second = d.get("taiho_aircraft", 0) + d.get("hybrid_aircraft", 0)
+        return ("CV%d(含大凤) 伊日%d 大和%d BB%d CA%d CL%d DD%d SS%d "
+                "航母机%d 二线机%d 陆攻%d 驻机%d" % (
+                    d["CV"], d.get("CV_hybrid", 0), d["BB_super"], d["BB"],
+                    d["CA"], d["CL"], d["DD"], d["SS"],
+                    d["carrier_aircraft"], second,
+                    d["land_bombers"], d["garrison_fighters"]))
     last_event = None
     for r in rows:
         if r["event"] or r["dl_us"] or r["dl_jp"]:
@@ -214,8 +249,13 @@ def main():
     print("  美军夺岛: %s (全战档不翻转)" % ("是" if res["captured"] else "否"))
     print("  守军撤出: %d 人 (%.1f%%)" % (res["evac_headcount"], res["evac_frac"] * 100))
     print("  美舰损失: %d 艘(加权) | 美机损失: %d 架" % (res["us_ships_lost"], res["us_air_lost"]))
-    print("  日航母机消耗: %d / 400 (不可补充＝承重墙)" %
-          (JT.JP_FLEET["carrier_aircraft"] - res["jp"]["carrier_aircraft"]))
+    jp_air_total = (JT.JP_FLEET["carrier_aircraft"] + JT.JP_FLEET["taiho_aircraft"]
+                    + JT.JP_FLEET["hybrid_aircraft"]
+                    - (res["jp"]["carrier_aircraft"] + res["jp"]["taiho_aircraft"]
+                       + res["jp"]["hybrid_aircraft"]))
+    print("  日航母机消耗: %d / %d (含大凤/伊日二线；不可补充＝承重墙)"
+          % (jp_air_total, JT.JP_FLEET["carrier_aircraft"] + JT.JP_FLEET["taiho_aircraft"]
+             + JT.JP_FLEET["hybrid_aircraft"]))
 
 if __name__ == "__main__":
     main()
