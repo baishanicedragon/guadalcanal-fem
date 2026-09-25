@@ -25,3 +25,8 @@ ehthumbs.db
 *.pat
 gh_pat.txt
 .env
+ww2_surface_sim/dist/
+ww2_surface_sim/dist_old_v08/
+ww2_surface_sim/build/
+*.pyc
+_selftest_result.txt

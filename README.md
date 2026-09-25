@@ -1,184 +1,115 @@
-# WW2 Naval Battle Compute · 二战海战命中率有限元推演
+# 二战水面战舰模拟游戏（ww2_surface_sim）
 
-> **English abstract:** An open, auditable Monte-Carlo / finite-element toolkit that estimates
-> WWII Pacific naval **hit-rates** for three domains — **naval gunnery** (BB-vs-BB night gunnery,
-> surface torpedo), **aerial torpedo bombing** (air-dropped torpedoes), and **air combat**
-> (fighter dogfight energy / turn maneuvering). Core methodology: *compute the clean
-> ballistic/geometric baseline from real range tables, then back out the disturbance factors
-> from historical measured results* — never guess a hit-rate from thin air. Standard-library
-> only, fully reproducible (fixed seeds). 本仓库原名 `guadalcanal-fem`，现扩展为覆盖二战海战
-> 三类命中率推算的公开查询仓库。
-
-一句话方法论：**先算模型，再用现实校正。否则会迷路。**
+**免装 Python、双击即玩的可执行版**，同时附完整 Python 源码与命令行入口。
+本仓库前期的舰炮/鱼雷/空战 FEM 弹道计算内容已降级为旧版本文档，见 [`docs/README_v1_fem_compute.md`](docs/README_v1_fem_compute.md)——它们现在是本游戏的物理引擎底层。
 
 ---
 
-## 这个仓库回答什么 / 不回答什么
+## 快速开始（EXE，免装 Python）
 
-- ✅ 在**给定装备、训练、夜战条件**下，舰炮、水面鱼雷、飞机投雷的攻击几何，以及**飞机近距空战（dogfight）
-  的能量机动 / 回转机动交换比**的**概率分布**，与双方**战损（沉没 / 重创 / 退出）的分布**。
-- ❌ **不**预测单场确定性结果；航空作战的**闭环飞行员操控手感**（俯冲轰炸 / 水平轰炸）未建模；
-  反潜、水雷、两栖、电子战软杀伤；**不**建模剧烈规避机动（蛇形 / 急转）。
-  （飞机投雷以**开环几何＋战斗投弹成功率参数**建模；飞机 dogfight 以**开环 E-M 几何＋飞行员质量因子**建模，
-  详见 `src/aerial_torpedo_fem.py` 与 `src/aircraft_dogfight_fem.py`）
-- 完整边界、假设、数据分级见 **[docs/model_applicability.md](docs/model_applicability.md)**。
+`dist/` 下两个独立可执行（PyInstaller onedir，各约 26MB，整个文件夹拷走即可在别的 Windows 机器运行）：
 
----
+| 文件 | 用途 |
+|---|---|
+| `dist/ww2_surface_sim/ww2_surface_sim.exe` | **GUI 完整版**（双击启动窗口） |
+| `dist/ww2_cli/ww2_cli.exe` | CLI 控制台版（cmd 运行） |
 
-## 三大模块（公众查询入口）
+```bat
+:: GUI 自检（窗口 0.8s 自开自关，验证运行时）
+ww2_surface_sim.exe --smoke
 
-| 领域 | 模块文件 | 内容 |
-|------|----------|------|
-| **海战 · 舰炮** | `src/gunnery_fem.py` | 战列舰夜战炮击命中率：真实弹道表飞行时间(TOF) + 火控/平台扰动 + 用实测锚点反推夜战干扰因子 |
-| **海战 · 水面鱼雷** | `src/torpedo_fem.py` | 驱逐舰直线雷对匀速编队命中率；九三式 vs Mk-15；「中弹减速＝最致命」(#17) 与引信可靠性 |
-| **鱼雷机轰炸** | `src/aerial_torpedo_fem.py` | 飞机投雷（九一式 / 九七舰攻 / 一式陆攻）几何命中底 + 「反击被击中」战损模型 + 三段链场景 |
-| **空战 · dogfight** | `src/aircraft_dogfight_fem.py` | 舰载战斗机近距空战：能量机动(E-M) + 回转机动，交换比 FEM（含 1943 fork 订正） |
+:: CLI 无头推演（场景英文别名 guadao / midway / tarawa）
+ww2_cli.exe --headless --scenario midway --ticks 80 --seed 42
 
-> 整场战役编排（非三类命中率本身，但依赖上述 FEM）：`src/mc_fem.py`（逐拍夜战主模型）、
-> `src/joint_tarawa_wargame.py`（塔拉瓦 1943 末 P0–P6 联合推演）、
-> `src/tarawa_timeline.py`（连续时间线版，30 分钟一步）、`src/report_200.py`（200 次 MC 逐舰下场报告）。
-
----
-
-## 仓库结构
-
-```
-ww2-naval-battle-compute/
-├── README.md                      # 本文件
-├── LICENSE                        # MIT（代码）；数据集另见下方「许可」
-├── .gitignore
-├── requirements.txt               # 仅标准库，无第三方依赖
-├── run_all.py                     # 一键运行三大模块（海战/鱼雷机/空战）
-├── docs/
-│   ├── methodology.md             # FEM 方法论：干净底 → 反推干扰因子
-│   └── model_applicability.md     # 模型适用性、假设边界、数据分级（重要）
-├── src/
-│   ├── gunnery_fem.py             # 海战① 战列舰炮击命中率 FEM
-│   ├── torpedo_fem.py             # 海战② 水面鱼雷命中率 FEM
-│   ├── aerial_torpedo_fem.py      # 鱼雷机轰炸 飞机投雷命中率 FEM
-│   ├── aircraft_dogfight_fem.py   # 空战 dogfight 能量/回转机动 交换比 FEM
-│   ├── mc_fem.py                  # 整场夜战推演主模型（按用户时间轴逐拍推进）
-│   ├── joint_tarawa_wargame.py    # 联合推演编排：串联上述 FEM 跑塔拉瓦 1943 末大战
-│   ├── tarawa_timeline.py         # 连续时间线版：从夜战起、每 30 分钟一步的连续推演
-│   └── report_200.py              # 200 次蒙特卡洛 · 双方成败 + 逐舰下场报告
-├── cases/
-│   ├── battleship_gunnery/        # 【案例】1904-1945 战列舰炮战命中数据集与假说检验
-│   │   ├── dataset.py             #   1904-1945 战舰被命中记录（清洗自维基战史）
-│   │   ├── analyze.py             #   检验「头 5-10 次命中决定战局」假说 → SVG + HTML
-│   │   └── README.md
-│   ├── naval_gunnery/             # 【案例】gunnery_fem.py 标准输出
-│   ├── aerial_torpedo_raid/       # 【案例】瓜岛 10/25 fork 次日 · 飞机投雷三段链推演
-│   │   ├── README.md              #   场景 A 拂晓G4M突袭残队 / B 南云Kate反杀企业号
-│   │   └── run_output.txt         #   aerial_torpedo_fem.py 原始输出
-│   ├── aircraft_dogfight/         # 【案例】1943 能量机动+回转机动 dogfight · fork 状态力量对比
-│   │   ├── README.md              #   场景1 机体对比 / 场景2 中太平洋交战 + fork 订正
-│   │   └── run_output.txt         #   aircraft_dogfight_fem.py 原始输出
-│   ├── guadalcanal_night_1942/   # 【案例】瓜岛夜战 200 次蒙特卡洛 · 逐舰下场
-│   │   └── 瓜岛夜战_200MC_逐舰下场.md
-│   ├── tarawa_1943_fork/          # 【案例】塔拉瓦 1943 末 · fork 推演稿
-│   └── tarawa_joint/              # 【案例】塔拉瓦 1943 末 · 联合推演（P0–P6 全阶段）
-│       ├── README.md              #   战役序列 + 标定锚 + 结果 + 诚实边界
-│       ├── run_output.txt         #   joint_tarawa_wargame.py 原始输出（n=500 均值）
-│       └── timeline_output.txt    #   tarawa_timeline.py 连续时间线（30 分钟一步，seed=42）
-└── results/                       # 各模块标准输出（run_all.py 生成，纯文本）
+:: CLI 交互推演
+ww2_cli.exe --cli --scenario guadao
 ```
 
----
+> ⚠️ 360 等国产杀软对无签名 PyInstaller exe 常见误报，请把 `dist/` 加入白名单。
 
-## 快速开始
+## GUI 玩法
 
-仅依赖 Python 标准库（`random` / `math` / `statistics` / `argparse` / `csv` / `subprocess`），
-无需安装任何第三方包。CPython 3.8+ 验证可用。
+1. **模块菜单**：完整战役 / 炮战实验室 / 鱼雷对决 / 航空战（四个可独立加载的模块）
+2. **完整战役**：选场景 →「背景」看战役介绍 →「设定」看全参数明细 → 双击舰种目录向日/美双方舰队增删（开局即用你的编成）→ 开始 → 单步 30s / 快进 ×10
+3. **实验室模块**：参数面板 + 1000 次蒙特卡洛，报告带史实锚点校准注释
+
+## 三个示例战役（背景介绍内置于游戏）
+
+| 场景 | 设定 | 学说锚点 |
+|---|---|---|
+| **瓜岛·不疯的山本** | 1942-11 夜战，萨沃岛反事实推演 | FEM 炮战/鱼雷模型 + 泗水海战校准（齐射命中率 0.31%） |
+| **中途岛·史实编成** | 1942-06-04，日方 `bait_operation`（山本诱饵战）+ 无雷达脆弱性 | 「必败者主动求败的自导自演」读法：正史九处狭缝（换弹混乱/警戒机不足/机库汽油） |
+| **塔拉瓦 1943末 fork** | **瓜岛胜利后的理想日本**（假定值）：金星零战 + 练度未损 + 雷达上舰，航空战力 ×1.3 | `hold_airfield` 战役目标：机场完好度决定战略判定 |
+
+「设定」面板 / CLI `settings` 命令披露全部明细：可见度、官僚水平（c2_penalty）、探测能力（传感器/范围/可靠性）、舰艇性能（舰种×数量×hp×航速×武器射程射速×弹药）、增援 tick。
+
+## 三个实验室子模块（可独立加载，`python main.py --lab gunnery|torpedo|air`）
+
+| 模块 | 学习点 | 史实锚点（已校准） |
+|---|---|---|
+| **炮战** gunnery | 命中率 × 距离 × 能见度 × 雷达 × 奇袭窗口 × 目标舰种 | 华盛顿-雾岛 7km 夜雷达奇袭齐射 23.7%（史实 20-27%）；泗水 1619 发→5.2 命中（史实 5） |
+| **鱼雷** torpedo | 93式酸素 vs Mk15 引信灾难/修复、队形/航速/能见度 | 同距 8km：93式 9.3% vs Mk15 mod0 0.8%（11.5 倍差）；DD 一雷沉 / BB TDS 7.8% |
+| **航空** air | 机型代差空战交换比；CAP 拦截 → 防空 → 命中链 | 零战二一 vs F4F 交换比 1.42；CAP 24 架拦截 20 攻击机 90% |
+
+## 自定义战役（对标鱼叉的"可学习"沙盒）
+
+- **时代选择**：1942 史实（Mk15 引信灾难 0.07 / 零战二一 / F4F / 日方纯光学）、**1943 fork·理想日本**（金星零战 0.92 / 日方雷达上舰 / Mk15 mod3 修复 0.45 / F6F）、1944 后期（日精英损耗 0.72）
+- **旋钮**：可见度（昼晴/昼雾/夜晴/夜雨雾）、官僚水平（日/美双滑杆，0~0.4）、探测倍率（0.5~2.0）
+- **单位编辑**：双击舰队列表项直接改 hp / 航速
+- **增援波次**：到 `arrive_tick` 整批入场
+
+## 引擎机制（30s/tick，六阶段 + 摩擦耦合）
+
+```
+P1 机动 → P2 索敌 → P3 火控 → P4 交战 → P5 损伤 → P6 撤退/重整
+  └─ fog/comms/visibility 共享潜变量（uncertainty.py 多维耦合不确定性）
+```
+
+- **溃散(routed) ≠ 专业撤离(withdrawing)**：士气崩溃不可重整 vs 指挥官基于损失比(≥50%)或战力比(<0.6)的有序撤出——两条独立状态
+- **对称结局**：规则双方同等生效；双方主力损失均≥40% → 双方惨败，损失差≤15% → 平局
+- **官僚主义 = 可调旋钮非核心**：`Side.c2_penalty` 折减探测与火控（中途岛 c2=0.25 时日方从 4:10 胜变 20:0 惨败——方向符合"IJN 发挥不当源于官僚主义"）
+- **机场毁伤**：AF 单位 hp=完好度%，鱼雷无效、<30% 出击节流；战役层 `hold_airfield` 目标判定
+- **增援**：`Reinforcement(arrive_tick, units)` 到点从本方质心后方入场
+
+## 从源码运行 / 打包
 
 ```bash
-# 0) 一键跑完三大模块（海战/鱼雷机轰炸/空战），顺序打印各自报告
-python run_all.py
-
-# 1) 单个组件的 FEM 干净底（真实弹道表标定）
-python src/gunnery_fem.py        # 战列舰炮击命中率（雷达 vs 光学，含夜战干扰因子反推）
-python src/torpedo_fem.py        # 鱼雷命中率（93 式 vs Mk-15，含中弹减速 #17 与引信可靠性）
-
-# 2) 飞机投雷 FEM（九一式/九七舰攻/一式陆攻 → 10/25 fork 次日三段链）
-python src/aerial_torpedo_fem.py
-
-# 3) 飞机 dogfight FEM（能量机动 + 回转机动 → 1943 fork 中太平洋力量对比）
-python src/aircraft_dogfight_fem.py
-
-# 4) 整场夜战推演（蒙特卡洛）
-python src/mc_fem.py --n 200 --scenario gambler     # fork 决战模型：4 旧 BB + 大和 + 照明弹
-python src/mc_fem.py --n 200 --scenario historical  # 史实瓜岛夜战：比睿/雾岛 vs 华盛顿/南达科他
-#   可选：--seed 42（默认）保证可复现；--json 输出 JSON；--shots-csv <path> 落点明细
-
-# 5) 联合推演：塔拉瓦 1943 末（串联上述 FEM 跑 P0–P6 全阶段大战）
-python src/joint_tarawa_wargame.py 500   # n=500 蒙特卡洛，seed=42，输出夺岛/双方损失/撤运
-
-# 6) 连续时间线版：从夜战起、每 30 分钟一步的连续推演（单次实现 seed=42）
-python src/tarawa_timeline.py > cases/tarawa_joint/timeline_output.txt
-
-# 7) 双方成败数字 + 逐舰下场报告（200 次，seed=42）
-python src/report_200.py > cases/guadalcanal_night_1942/200MC_report.md
+cd ww2_surface_sim
+python main.py                          # Tkinter GUI
+python main.py --cli --scenario 塔拉瓦   # 命令行交互（step/run N/status/airfields/settings/outcome）
+python main.py --headless --scenario 瓜岛 --ticks 60 --seed 42   # 无头可复现
+python _diag_outcome.py                 # 三场景终局分布 + 官僚主义旋钮对比
 ```
 
-> 说明：`mc_fem.py` / `report_200.py` 以相对路径写 `output/`，请在其所在目录内运行
-> （已加入 `.gitignore`，不提交大文件）。本仓库 `results/` 与 `cases/*/run_output.txt`
-> 为各模块当前代码生成的标准输出，便于公众直接查阅而无需本地运行。
+```bash
+# PyInstaller 打包（需含 tkinter 的 Python；venv 场景需设 TCL_LIBRARY 指向系统 Python 的 tcl 目录）
+pyinstaller --noconfirm --windowed --name ww2_surface_sim --collect-all tkinter --hidden-import _tkinter main.py
+pyinstaller --noconfirm --console  --name ww2_cli           --collect-all tkinter --hidden-import _tkinter main.py
+```
 
----
+## 目录结构
 
-## 关键结论（来自 FEM）
+```
+ww2_surface_sim/
+├── main.py              # 入口：GUI / CLI / 无头 / 实验室
+├── FRAMEWORK.md         # 架构设计文档（v0.9）
+├── run_cli.bat / run_headless.bat
+├── sim/
+│   ├── model.py         # Unit/Side/Weapon/Sensor/Rules/Reinforcement
+│   ├── engine.py        # 30s tick 六阶段引擎 + 对称结局 + 战役层
+│   ├── uncertainty.py   # 多维耦合不确定性（共享潜变量摩擦）
+│   ├── fem_bridge.py    # FEM 弹道模型桥接（炮/雷/空命中率）
+│   ├── scenarios.py     # 三战役 OOB（含机场与增援）
+│   ├── catalog.py       # 时代化舰种目录（1942/1943fork/1944）
+│   ├── intros.py        # 战役背景介绍 + 设定明细披露
+│   ├── gunnery_lab.py / torpedo_lab.py / air_lab.py   # 三实验室
+│   └── ...
+└── gui/
+    ├── app.py           # Tkinter 主程序（模块选择/编成/旋钮/海图）
+    ├── chart_helpers.py # 海图图元（舰三角 + 鱼叉式不确定菱形）
+    └── state_markers.py # 状态分色图元 + 结局映射
+```
 
-1. **战列舰炮击干净底**：含匀速平台扰动后，雷达火控侧约 **31%**、光学（日方）侧约 **5.7%**（@8 kyd）。
-   实测 12% / 1.7%（华盛顿→雾岛 / 雾岛→南达科他）意味着夜战混乱吃掉了 60–70% 的真实能力——
-   **夜战是传感器与指挥的战争，不是弹道的战争**。
-2. **鱼雷干净底**：匀速编队正是直线雷的好靶子——3° 散布在 18 km 仅偏移约 943 m，远小于编队半宽约 1829 m，
-   单条雷命中整编队约 **44%**。但**中弹减速 = 最致命**：所瞄舰减速后命中率从满速 4.1% 升到停车 8.9%（约 2.2×）。
-3. **实测差异几乎全在引信 / 定深可靠性**：93 式（接触引信可靠、浅定深）≈ 0.80；Mk-15（1942 磁引信灾难性失效、深弹道）≈ 0.07——
-   所以 1942 美军鱼雷全年近乎零战果，**不是几何打不中，是引信与指挥的问题**。
-4. **飞机投雷干净底极高**（投弹距离 900 m：CV≈96%、低速 BB≈99%）——匀速/低速大舰是鱼雷机好靶子；
-   「打不中」主要来自**战斗投弹成功率 combat_drop**（无掩护≈0.85 / fork企业号≈0.45 / 史实企业号≈0.22，由圣克鲁斯·中途岛锚点反推）
-   与可靠性，而非几何。套到 10/25 fork 次日：拂晓 G4M 突袭残队（无弹无 CAP）期望 11.7 雷命中、沉没 99.9%；
-   南云 Kate 突击 fork 企业号（CAP 减半）期望 8.0 雷命中、沉没 98.6%——**反杀概率远高于史实**，
-   三段链（突袭残队→金凯德追日战列舰→南云反杀）自洽。
-5. **飞机 dogfight（能量机动 + 回转机动）**：在 1942 fork（日本赢瓜岛、获「完整 1943」）背景下，
-   山本用**成熟机体换发（金星零战 = A6M 机体 + 金星62型 1500-1560hp）+ 油旁训练拔升飞行员质量 + 三级体系真训**，
-   把 1943 中太平洋空战从 OTL 的崩溃（交换比 0.40）拉到**局部均势甚至日优（单场 1.10 / 战役 1.78）**；
-   但这是**窗口期红利**——工业/人口/教官池/双刃教条四条铁律未动，1944 仍是美国的年。
-   最敏感的杠杆是**飞行员质量**（金星零战对 F6F，JP PQF 0.50→0.92 对应交换比 0.74→1.28），非机体。
-6. **塔拉瓦 1943 末联合推演**（`joint_tarawa_wargame.py`，P0–P6，含跨越轰炸方针对比）：
-   美夺岛概率 100%（全战档铁律 #17 不翻转）；日本按「杀伤 + 撤运（丁型驱逐舰 + 潜艇）不夺回」方针——
-   **bb_line（打残舰就撤）**：美舰损 14.34 艘（5 艘新锐 BB 全灭）＋116 机，日机损 145（27% 池）——**效率高 2.6 倍**；
-   **cv_first（先打航母放血）**：美 CV/CVL 损 4.18/8（拆掉美军进攻之臂）＋188 机，日机损 254（48% 池）——不可常态化。
-   日航母因跨越轰炸后撤近 0 沉（发射点回溯仅小概率受损）；瑞凤 36 战斗机专职直卫第二舰队。
-   载机状态含 fork 新造左移（大凤提前入列＋伊/日改装舰二线，信浓赶不上本战）。
-   ⇒ 战术更血腥、战略仍失、且反噬预备队（缩短喘息期）；fork 最优解＝混合方针。
+## 旧版本（FEM 弹道计算）
 
----
-
-## 数据来源与分级
-
-历史数字分三级对待（来源越独立，权重越高）：
-
-| 级别 | 来源 | 用途 |
-|------|------|------|
-| 一级 | 独立机构复核 / 多源交叉印证 | 作为量级基准 |
-| 二级 | 行业机构区间 / 交战双方各自通报的区间 | 作方向，不作精确值 |
-| 三级 | 参战方单方通报 | 只作方向与量级，不作精确值 |
-
-弹道参数查表标定：US 16"/45 Mk6 + AP Mk8（MV 701 m/s）、JP 46cm Type94 + 91 式 AP（MV 780 m/s）。
-`cases/battleship_gunnery/` 数据集清洗自维基百科战史条目（CC-BY-SA），属二级口径，结论为概率性推断而非定论。
-
----
-
-## 许可
-
-- **代码**（`src/`、`cases/*/analyze.py`、`report_200.py` 等）：[MIT License](LICENSE)。
-- **数据集**（`cases/battleship_gunnery/dataset.py` 及派生统计）：源自维基百科（CC-BY-SA），使用时请署名并保留相同许可。
-- 本仓库用于**推演 / 教育 / 兵棋研究**，命中率与战果均为参数化蒙特卡洛结果，不代表任何官方史料定论。
-- 模型参数（散布、火控误差、可靠性因子）均可审计、可改写。
-
----
-
-## 免责声明
-
-本仓库为量化推演模型。模型参数可由用户改写；任何推演结论均依赖输入的参数与史实锚点，
-锚点若有误则反推出的干扰因子亦随之偏移。请勿将本模型输出作为严肃历史研究的唯一依据。
+v1 的独立 Python 脚本群（舰炮命中率、鱼雷命中、空战 FEM 计算）移至 `docs/README_v1_fem_compute.md` 所述位置，其物理模型经 `sim/fem_bridge.py` 桥接进本游戏引擎。
